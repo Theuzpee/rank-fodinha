@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Carta branca com um triângulo azul, dentro da área segura do ícone. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,30 L70,30 Q74,30 74,34 L74,74 Q74,78 70,78 L38,78 Q34,78 34,74 L34,34 Q34,30 38,30 Z" />
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M48,44 L60,54 L48,64 Z" />
+</vector>

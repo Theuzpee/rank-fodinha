@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Pasta temporária onde a câmera grava a foto do avatar antes de ela ser reduzida e salva. -->
+    <cache-path name="avatares_tmp" path="avatares-tmp/" />
+</paths>

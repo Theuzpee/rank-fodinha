@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 e versões seguintes. As fotos dos avatares não vão para a nuvem nem para o aparelho novo. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="avatares/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="avatares/" />
+    </device-transfer>
+</data-extraction-rules>

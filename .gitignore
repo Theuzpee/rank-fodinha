@@ -1,0 +1,52 @@
+# Built artifacts
+/build
+/.gradle
+/app/build
+/local.properties
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aar
+*.ap_
+*.dex
+*.class
+*.hprof
+
+# IDE - IntelliJ IDEA / Android Studio
+.idea/
+*.iml
+*.iws
+*.ipr
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/shelf
+/.idea/modules
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Signing files
+*.jks
+*.keystore
+*.p12
+*.key
+*.pub
+!debug.keystore
+
+# Logs
+*.log
+
+# Project specific
+.agent/
+.kotlin/
+
+# Secrets
+google-services.json
+firebase-debug.json
