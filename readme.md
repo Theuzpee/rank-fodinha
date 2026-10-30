@@ -4,8 +4,8 @@ App Android nativo (Kotlin + Jetpack Compose) para acompanhar as vidas numa part
 
 ## O que o app tem
 
-- **Jogo**: partida em andamento. Cada jogador começa com a quantidade de vidas escolhida. Quando alguém perde uma vida, toque em − ao lado do nome. O + corrige um toque errado. Quem zera as vidas sai da partida, e o último com vida vence. Para encerrar antes, toque em **Finalizar partida** e escolha quem ganhou.
-- **Ranking**: vitórias, jogos e aproveitamento, só com partidas encerradas. A seção **Morte** mostra quem mais vezes morreu primeiro em uma partida. Partidas feitas antes dessa versão não entram nela, porque não guardam a ordem das mortes. O botão **Limpar ranking** apaga as partidas encerradas (e com elas a lista de partidas anteriores), depois de pedir confirmação. Os jogadores continuam cadastrados.
+- **Jogo**: partida em andamento. Cada jogador começa com a quantidade de vidas escolhida. Quando alguém perde uma vida, toque em − ao lado do nome. O + corrige um toque errado. Quem zera as vidas sai da partida, e o último com vida vence. Para encerrar antes, toque em **Finalizar partida** e escolha quem ganhou. Se escolher mais de um jogador, a partida termina em empate. Quando sobrarem três jogadores com uma vida cada, aparece o botão **Finalizar partida em empate**.
+- **Ranking**: vitórias, empates e derrotas, só com partidas encerradas. Empate não conta como vitória. A seção **Derrotas** mostra quem mais perdeu partidas. O botão **Limpar ranking** apaga as partidas encerradas (e com elas a lista de partidas anteriores), depois de pedir confirmação. Os jogadores continuam cadastrados.
 - **Jogadores**: cadastro dos colegas. Todos os cadastrados entram na nova partida; dá para desmarcar quem não vai jogar.
 
 As regras estão em [docs/regras-fodinha.md](docs/regras-fodinha.md).
@@ -58,7 +58,7 @@ Os dados salvos pela versão anterior, que tinha palpites e vazas, são converti
 
 ## Visual
 
-O app usa só o tema claro, mesmo quando o aparelho está no modo escuro. A fonte é a Figtree, sob a licença SIL Open Font License (`licenses/FIGTREE-OFL.txt`). Os botões e destaques são verdes. O vermelho aparece só em erros e em ações que apagam dados, como Remover e Limpar ranking. Ao cadastrar, o app abre a câmera para tirar a foto do jogador, e o cadastro só acontece depois da foto. Para trocar a foto depois, toque no avatar do jogador na aba Jogadores. As fotos ficam salvas só neste aparelho. Jogadores cadastrados antes dessa regra usam uma das 7 fotos da equipe até trocarem.
+O app usa só o tema claro, mesmo quando o aparelho está no modo escuro. A fonte é a Figtree, sob a licença SIL Open Font License (`licenses/FIGTREE-OFL.txt`). Os botões e destaques são verdes, e o botão de empate é âmbar. O vermelho aparece só em erros e em ações que apagam dados, como Remover e Limpar ranking. Ao cadastrar, o app abre a câmera para tirar a foto do jogador, e o cadastro só acontece depois da foto. Para trocar a foto depois, toque no avatar do jogador na aba Jogadores. As fotos ficam salvas só neste aparelho. Jogadores cadastrados antes dessa regra usam uma das 7 fotos da equipe até trocarem.
 
 ## Estrutura
 

@@ -25,6 +25,20 @@ fun createGame(id: String, startedAt: String, playerIds: List<String>, settings:
 fun alivePlayers(game: Game): List<String> =
     game.playerIds.filter { (game.lives[it] ?: 0) > 0 }
 
+/** Com quantos jogadores com vida o app oferece o botão de empate. */
+const val TIE_OFFER_ALIVE = 3
+
+/**
+ * Jogadores que podem empatar agora: exatamente [TIE_OFFER_ALIVE] com vida, e cada um com uma vida só.
+ * Nulo nos outros casos e em partidas já encerradas. A ordem é a da mesa.
+ */
+fun tieOfferPlayers(game: Game): List<String>? {
+    if (game.finishedAt != null) return null
+    val alive = alivePlayers(game)
+    if (alive.size != TIE_OFFER_ALIVE) return null
+    return if (alive.all { game.lives[it] == 1 }) alive else null
+}
+
 /**
  * Soma [delta] às vidas de um jogador: -1 quando ele perde uma vida, +1 para corrigir.
  * As vidas não ficam abaixo de zero. Quando sobra no máximo um jogador com vida,

@@ -21,6 +21,10 @@ val SurfaceHighest = Color(0xFFF0E0DA)
 val Outline = Color(0xFFD6BFB9)
 val OutlineVariant = Color(0xFFE8D5CF)
 
+// Empate: âmbar, a cor do botão que encerra a partida empatada.
+val AmberContainer = Color(0xFFFFC107)
+val OnAmberContainer = Color(0xFF3B2A00)
+
 val ErrorRed = Color(0xFFB3261E)
 val ErrorContainer = Color(0xFFFDE3E0)
 val OnErrorContainer = Color(0xFF410E0B)

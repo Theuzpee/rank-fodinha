@@ -78,14 +78,17 @@ class RankingTest {
     }
 
     @Test
-    fun everyWinnerOfAGameGetsAWin() {
+    fun aTieIsNotAWinButEachTiedPlayerGetsATie() {
         val rows = buildRanking(
             listOf(ana, bruno, carla),
             listOf(finished("g", listOf("ana", "bruno", "carla"), listOf("ana", "carla"))),
         )
-        assertEquals(1, rows.byId("ana").wins)
+        assertEquals(0, rows.byId("ana").wins)
+        assertEquals(1, rows.byId("ana").ties)
         assertEquals(0, rows.byId("bruno").wins)
-        assertEquals(1, rows.byId("carla").wins)
+        assertEquals(1, rows.byId("bruno").losses)
+        assertEquals(0, rows.byId("carla").wins)
+        assertEquals(1, rows.byId("carla").ties)
     }
 
     @Test

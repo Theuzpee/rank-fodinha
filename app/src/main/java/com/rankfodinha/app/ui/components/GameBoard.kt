@@ -66,7 +66,11 @@ private fun GameHeaderCard(game: Game, nameOf: (String) -> String) {
     AppCard {
         SectionTitle("Partida encerrada")
         Text(
-            text = "Vencedor: ${formatNames(game.winnerIds.map(nameOf))}",
+            text = if (game.winnerIds.size > 1) {
+                "Empate: ${formatNames(game.winnerIds.map(nameOf))}"
+            } else {
+                "Vencedor: ${formatNames(game.winnerIds.map(nameOf))}"
+            },
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
         )

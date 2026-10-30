@@ -1,5 +1,6 @@
 package com.rankfodinha.app.ui.components
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Button
@@ -17,18 +18,23 @@ import androidx.compose.ui.unit.dp
 /** Altura mínima dos botões, para um alvo de toque confortável. */
 private val BUTTON_MIN_HEIGHT = 56.dp
 
-/** Botão principal, ocupando a largura disponível. */
+/**
+ * Botão principal, ocupando a largura disponível. [contentPadding] reduz o espaço ao redor do texto,
+ * para o rótulo caber em uma linha quando o botão divide a linha com outro.
+ */
 @Composable
 fun AppButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.fillMaxWidth().heightIn(min = BUTTON_MIN_HEIGHT),
+        contentPadding = contentPadding,
     ) {
         Text(text = text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
     }

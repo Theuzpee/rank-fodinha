@@ -165,17 +165,25 @@ class FodinhaViewModel(private val repository: FodinhaRepository) : ViewModel() 
         updateActiveGame { changeLives(it, playerId, delta, now()) }
     }
 
-    /** Encerra a partida em andamento e registra quem ganhou. A partida passa a contar no ranking. */
-    fun finishGame(winnerId: String): String? {
+    /**
+     * Encerra a partida em andamento. Um jogador escolhido é vitória; mais de um é empate.
+     * A partida passa a contar no ranking. Pode ser encerrada antes de sobrar um só jogador com vida.
+     */
+    fun finishGame(winnerIds: List<String>): String? {
         notLoadedError()?.let { return it }
         val game = activeGame() ?: return "Não há partida em andamento."
-        if (winnerId !in game.playerIds) {
-            return "Escolha um jogador da partida."
+        if (winnerIds.isEmpty()) {
+            return "Escolha pelo menos um jogador."
         }
+        if (winnerIds.any { it !in game.playerIds }) {
+            return "Escolha jogadores da partida."
+        }
+        // Os vencedores ficam na ordem da mesa, para aparecerem sempre do mesmo jeito.
+        val chosen = game.playerIds.filter { it in winnerIds }
         mutate { data ->
             data.copy(
                 games = data.games.map {
-                    if (it.id == game.id) it.copy(finishedAt = now(), winnerIds = listOf(winnerId)) else it
+                    if (it.id == game.id) it.copy(finishedAt = now(), winnerIds = chosen) else it
                 },
             )
         }

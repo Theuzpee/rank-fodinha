@@ -59,8 +59,8 @@ class RankingUiTest {
         val vm = viewModelWithPlayers("Ana", "Bruno")
         compose.runOnUiThread { finishQuickGame(vm, "Ana", "Bruno") }
         show(vm)
-        compose.onNodeWithText("1 vitória · 1 jogo · 100,0% de aproveitamento").assertIsDisplayed()
-        compose.onNodeWithText("0 vitórias · 1 jogo · 0,0% de aproveitamento").assertIsDisplayed()
+        compose.onNodeWithText("1 vitória · 0 empates · 0 derrotas").assertIsDisplayed()
+        compose.onNodeWithText("0 vitórias · 0 empates · 1 derrota").assertIsDisplayed()
     }
 
     @Test
@@ -107,7 +107,7 @@ class RankingUiTest {
         compose.onNode(hasText("Cancelar") and hasAnyAncestor(isDialog())).performClick()
         compose.waitForIdle()
 
-        compose.onNodeWithText("1 vitória · 1 jogo · 100,0% de aproveitamento").assertIsDisplayed()
+        compose.onNodeWithText("1 vitória · 0 empates · 0 derrotas").assertIsDisplayed()
         assertEquals(1, vm.data.value.games.size)
     }
 

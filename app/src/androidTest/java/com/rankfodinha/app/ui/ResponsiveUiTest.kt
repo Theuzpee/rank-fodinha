@@ -123,7 +123,7 @@ class ResponsiveUiTest {
 
         assertInsideBox(
             "resumo do ranking",
-            compose.onNodeWithText("1 vitória · 1 jogo · 100,0% de aproveitamento"),
+            compose.onNodeWithText("1 vitória · 0 empates · 0 derrotas"),
         )
         assertInsideBox("botão Limpar ranking", compose.onNodeWithText("Limpar ranking"))
     }

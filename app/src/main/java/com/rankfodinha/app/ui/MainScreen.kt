@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -107,8 +109,12 @@ fun MainScreen() {
 
     val entries = navigationState.toEntries(entryProvider)
     val currentRoute = navigationState.backStacks[navigationState.topLevelRoute]?.lastOrNull()
+    // Com o teclado aberto, a barra some. A tela é de borda a borda, então o teclado não a empurra,
+    // e ela ficaria escondida atrás dele, com um espaço vazio em cima.
+    val density = LocalDensity.current
+    val keyboardOpen = WindowInsets.ime.getBottom(density) > 0
     // A tela de nova partida ocupa a tela toda, sem a barra de abas.
-    val showBottomBar = currentRoute != RootRoute.NovaPartida
+    val showBottomBar = currentRoute != RootRoute.NovaPartida && !keyboardOpen
 
     Scaffold(
         bottomBar = {
