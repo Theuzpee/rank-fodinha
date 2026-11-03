@@ -26,7 +26,8 @@ private fun tallies(players: List<Player>, games: List<Game>): List<RankingRow> 
     val wins = mutableMapOf<String, Int>()
     val ties = mutableMapOf<String, Int>()
     for (game in games) {
-        if (game.finishedAt == null) continue
+        // Partida sem vencedor registrado não tem resultado. Fica fora até ser completada.
+        if (game.finishedAt == null || game.winnerIds.isEmpty()) continue
         val tie = game.winnerIds.size > 1
         for (id in game.playerIds) {
             played[id] = (played[id] ?: 0) + 1
@@ -54,7 +55,7 @@ private fun tallies(players: List<Player>, games: List<Game>): List<RankingRow> 
 }
 
 /**
- * Ranking com base nas partidas encerradas. Partidas em andamento não entram.
+ * Ranking com base nas partidas encerradas que têm vencedor. Partidas em andamento e sem vencedor não entram.
  * Com um único vencedor, ele ganha a partida e os outros perdem. Com mais de um vencedor, é empate:
  * os empatados ganham um empate, e os demais perdem.
  */
@@ -87,38 +88,6 @@ fun buildRanking(players: List<Player>, games: List<Game>): List<RankingRow> {
     return result
 }
 
-/**
- * Rank de derrotas: quantas partidas encerradas cada jogador perdeu, ou seja, não venceu nem empatou.
- * Quem mais perdeu fica em primeiro. Empate não é derrota.
- */
-fun buildDefeatRanking(players: List<Player>, games: List<Game>): List<RankingRow> {
-    // Quem jogou vem primeiro. Entre eles: mais derrotas, depois mais jogos e nome.
-    val rows = tallies(players, games)
-        .sortedWith(
-            compareByDescending<RankingRow> { it.played > 0 }
-                .thenByDescending { it.losses }
-                .thenByDescending { it.played }
-                .thenBy { it.name.lowercase() }
-        )
-
-    val result = ArrayList<RankingRow>(rows.size)
-    var position = 0
-    var previous: RankingRow? = null
-    for ((index, row) in rows.withIndex()) {
-        if (row.played == 0) {
-            result += row
-            continue
-        }
-        val prev = previous
-        val tied = prev != null && prev.losses == row.losses
-        if (!tied) position = index + 1
-        val ranked = row.copy(position = position)
-        result += ranked
-        previous = ranked
-    }
-    return result
-}
-
 /** Linha do rank de quem mais morreu primeiro. */
 data class FirstDeathRow(
     val playerId: String,
@@ -137,6 +106,7 @@ data class FirstDeathRow(
 /**
  * Rank de quem mais morreu primeiro: quantas vezes cada jogador foi o primeiro a perder todas as vidas.
  * Só entram partidas encerradas. Partidas feitas antes de a ordem das mortes ser guardada não contam.
+ * Partidas em que as primeiras mortes foram juntas não contam para ninguém.
  */
 fun buildFirstDeathRanking(players: List<Player>, games: List<Game>): List<FirstDeathRow> {
     val played = mutableMapOf<String, Int>()
@@ -146,8 +116,11 @@ fun buildFirstDeathRanking(players: List<Player>, games: List<Game>): List<First
         for (id in game.playerIds) {
             played[id] = (played[id] ?: 0) + 1
         }
-        game.eliminated.firstOrNull()?.let { first ->
-            firstDeaths[first] = (firstDeaths[first] ?: 0) + 1
+        // Quando as primeiras mortes foram juntas, ninguém morreu primeiro, e a partida não conta em Derrotas.
+        if (!game.firstDeathTogether) {
+            game.eliminated.firstOrNull()?.let { first ->
+                firstDeaths[first] = (firstDeaths[first] ?: 0) + 1
+            }
         }
     }
 

@@ -14,7 +14,10 @@ import com.rankfodinha.app.data.MIN_STARTING_LIVES
 import com.rankfodinha.app.data.Player
 import com.rankfodinha.app.data.changeLives
 import com.rankfodinha.app.data.createGame
+import com.rankfodinha.app.data.isIncomplete
 import com.rankfodinha.app.data.isValidStartingLives
+import com.rankfodinha.app.data.needsFirstOut
+import com.rankfodinha.app.data.needsWinner
 import java.time.Instant
 import java.util.UUID
 import kotlin.random.Random
@@ -184,6 +187,69 @@ class FodinhaViewModel(private val repository: FodinhaRepository) : ViewModel() 
             data.copy(
                 games = data.games.map {
                     if (it.id == game.id) it.copy(finishedAt = now(), winnerIds = chosen) else it
+                },
+            )
+        }
+        return null
+    }
+
+    /**
+     * Completa uma partida antiga que não tem vencedor, ou que não diz quem morreu primeiro.
+     * Só preenche o que falta: o que já estava registrado não muda.
+     * [winnerIds] vale quando falta o vencedor: um jogador é vitória, mais de um é empate.
+     * [firstOutId] vale quando falta quem morreu primeiro, e precisa ser um jogador que ficou sem vida na partida.
+     * [diedTogether] vale no mesmo caso, quando nenhum jogador morreu antes dos outros. Não se usa junto com [firstOutId].
+     * Devolve a mensagem de erro, ou null quando deu certo.
+     */
+    fun completeGame(gameId: String, winnerIds: List<String>, firstOutId: String?, diedTogether: Boolean): String? {
+        notLoadedError()?.let { return it }
+        val game = _data.value.games.firstOrNull { it.id == gameId } ?: return "Esta partida não existe mais."
+        if (game.finishedAt == null) {
+            return "Esta partida ainda está em andamento."
+        }
+        if (!isIncomplete(game)) {
+            return "Esta partida já está completa."
+        }
+
+        val winners = if (needsWinner(game)) {
+            if (winnerIds.isEmpty()) {
+                return "Escolha pelo menos um jogador."
+            }
+            if (winnerIds.any { it !in game.playerIds }) {
+                return "Escolha jogadores da partida."
+            }
+            // Os vencedores ficam na ordem da mesa, como em finishGame.
+            game.playerIds.filter { it in winnerIds }
+        } else {
+            game.winnerIds
+        }
+
+        val fallen = game.playerIds.filter { (game.lives[it] ?: 0) == 0 }
+        var eliminated = game.eliminated
+        var firstDeathTogether = game.firstDeathTogether
+        if (needsFirstOut(game)) {
+            if (diedTogether) {
+                if (firstOutId != null) {
+                    return "Escolha quem morreu primeiro, ou marque que morreram juntos."
+                }
+                firstDeathTogether = true
+            } else {
+                if (firstOutId == null || firstOutId !in fallen) {
+                    return "Escolha quem morreu primeiro."
+                }
+                // Só o primeiro tem a ordem confirmada. Os outros sem vida entram na ordem da mesa.
+                eliminated = listOf(firstOutId) + fallen.filter { it != firstOutId }
+            }
+        }
+
+        mutate { data ->
+            data.copy(
+                games = data.games.map {
+                    if (it.id == gameId) {
+                        it.copy(winnerIds = winners, eliminated = eliminated, firstDeathTogether = firstDeathTogether)
+                    } else {
+                        it
+                    }
                 },
             )
         }

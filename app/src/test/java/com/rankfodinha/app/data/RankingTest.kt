@@ -231,4 +231,11 @@ class RankingTest {
         val games = gamesFor("ana", "bruno", 3, 1, "p") + listOf(finished("open", listOf("ana", "bruno"), emptyList(), null))
         assertEquals(3, buildRanking(listOf(ana, bruno), games).byId("ana").played)
     }
+
+    @Test
+    fun aFinishedGameWithoutAWinnerStaysOutOfTheRankingUntilItIsCompleted() {
+        val games = listOf(finished("antiga", listOf("ana", "bruno", "carla"), emptyList()))
+        val rows = buildRanking(listOf(ana, bruno, carla), games)
+        assertTrue(rows.all { it.played == 0 && it.wins == 0 && it.ties == 0 && it.losses == 0 })
+    }
 }

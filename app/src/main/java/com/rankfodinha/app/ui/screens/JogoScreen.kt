@@ -17,6 +17,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -37,9 +38,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rankfodinha.app.data.Game
 import com.rankfodinha.app.data.Player
+import com.rankfodinha.app.data.isIncomplete
+import com.rankfodinha.app.data.isTieWithUnknownPlayers
+import com.rankfodinha.app.data.needsFirstOut
+import com.rankfodinha.app.data.needsWinner
 import com.rankfodinha.app.data.tieOfferPlayers
 import com.rankfodinha.app.ui.components.AppButton
 import com.rankfodinha.app.ui.components.AppCard
+import com.rankfodinha.app.ui.components.AppOutlinedButton
 import com.rankfodinha.app.ui.components.AvatarBadge
 import com.rankfodinha.app.ui.components.GameBoard
 import com.rankfodinha.app.ui.components.ScreenColumn
@@ -59,7 +65,7 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
     val finished = data.games
         .filter { it.finishedAt != null }
         .sortedByDescending { it.finishedAt ?: "" }
-    // Empate entre três jogadores com uma vida cada: a oferta aparece só nessa situação.
+    // Dois ou mais jogadores vivos, todos com uma vida: a oferta de empate aparece só nessa situação.
     val tieOffer = active?.let { tieOfferPlayers(it) }
     // Quando a oferta aparece, a tela rola até o botão de empate e o botão recebe o foco.
     val tieScroll = remember { BringIntoViewRequester() }
@@ -74,7 +80,9 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     var chooseWinner by rememberSaveable { mutableStateOf(false) }
     var confirmTie by rememberSaveable { mutableStateOf(false) }
-    var finishError by remember { mutableStateOf<String?>(null) }
+    // Partida antiga aberta para completar. Guarda o id, para a escolha sobreviver à rotação da tela.
+    var completingId by rememberSaveable { mutableStateOf<String?>(null) }
+    var actionError by remember { mutableStateOf<String?>(null) }
 
     ScreenColumn {
         if (active != null) {
@@ -93,7 +101,7 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
                 )
                 DiscardButton(onClick = { confirmDiscard = true })
             }
-            // Três jogadores com uma vida cada: o empate entre eles é oferecido aqui, antes de as mortes acontecerem.
+            // Todos os jogadores vivos com uma vida: o empate entre eles é oferecido aqui, antes de as mortes acontecerem.
             if (tieOffer != null) {
                 TieOfferButton(
                     requester = tieScroll,
@@ -110,6 +118,11 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
                 RulesCard()
             }
             AppButton(text = "Nova partida", onClick = onNewGame)
+            // Partidas antigas sem vencedor, ou sem quem morreu primeiro, ficam aqui até serem completadas.
+            val incomplete = finished.filter { isIncomplete(it) }
+            if (incomplete.isNotEmpty()) {
+                IncompleteGamesCard(games = incomplete, onComplete = { completingId = it.id })
+            }
             if (finished.size > 1) {
                 PastGamesCard(games = finished.drop(1), names = names)
             }
@@ -121,7 +134,7 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
             players = active.playerIds.mapNotNull { id -> data.players.firstOrNull { it.id == id } },
             onConfirm = { winnerIds ->
                 chooseWinner = false
-                finishError = viewModel.finishGame(winnerIds)
+                actionError = viewModel.finishGame(winnerIds)
             },
             onDismiss = { chooseWinner = false },
         )
@@ -140,7 +153,7 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     confirmTie = false
-                    finishError = viewModel.finishGame(tieOffer)
+                    actionError = viewModel.finishGame(tieOffer)
                 }) {
                     Text("Empatar")
                 }
@@ -153,13 +166,28 @@ fun JogoScreen(viewModel: FodinhaViewModel, onNewGame: () -> Unit) {
         )
     }
 
-    finishError?.let { message ->
+    completingId?.let { id ->
+        val game = finished.firstOrNull { it.id == id }
+        if (game != null && isIncomplete(game)) {
+            CompleteGameDialog(
+                game = game,
+                players = data.players,
+                onConfirm = { winnerIds, firstOutId, diedTogether ->
+                    completingId = null
+                    actionError = viewModel.completeGame(game.id, winnerIds, firstOutId, diedTogether)
+                },
+                onDismiss = { completingId = null },
+            )
+        }
+    }
+
+    actionError?.let { message ->
         AlertDialog(
-            onDismissRequest = { finishError = null },
+            onDismissRequest = { actionError = null },
             title = { Text("Atenção") },
             text = { Text(message) },
             confirmButton = {
-                TextButton(onClick = { finishError = null }) {
+                TextButton(onClick = { actionError = null }) {
                     Text("OK")
                 }
             },
@@ -202,7 +230,7 @@ private fun DiscardButton(onClick: () -> Unit) {
 }
 
 /**
- * Botão de empate, em âmbar: aparece com três jogadores com uma vida cada e leva a uma confirmação antes de encerrar.
+ * Botão de empate, em âmbar: aparece quando todos os jogadores vivos têm uma vida e leva a uma confirmação antes de encerrar.
  * Quando aparece, a tela rola até ele e ele recebe o foco (por isso tem [requester] e [focus]).
  */
 @Composable
@@ -329,7 +357,12 @@ private fun PastGamesCard(games: List<Game>, names: Map<String, String>) {
         SectionTitle("Partidas anteriores")
         games.forEach { game ->
             val winners = formatNames(game.winnerIds.map { names[it] ?: "Jogador removido" })
-            val result = if (game.winnerIds.size > 1) "Empate: $winners" else "Vencedor: $winners"
+            val result = when {
+                isTieWithUnknownPlayers(game) -> "Empate. Quem empatou não foi registrado."
+                game.winnerIds.isEmpty() -> "Vencedor não registrado"
+                game.winnerIds.size > 1 -> "Empate: $winners"
+                else -> "Vencedor: $winners"
+            }
             Text(
                 text = formatDateTime(game.finishedAt ?: game.startedAt),
                 style = MaterialTheme.typography.bodyMedium,
@@ -338,6 +371,197 @@ private fun PastGamesCard(games: List<Game>, names: Map<String, String>) {
                 text = result,
                 style = MaterialTheme.typography.bodyLarge,
                 fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** Partidas antigas que ainda precisam de vencedor, ou de quem morreu primeiro. Cada uma tem o botão Completar. */
+@Composable
+private fun IncompleteGamesCard(games: List<Game>, onComplete: (Game) -> Unit) {
+    AppCard {
+        SectionTitle("Partidas para completar")
+        Text(
+            text = "Sem vencedor, a partida fica fora do ranking de vitórias. " +
+                "Sem o primeiro a morrer, ela não entra no rank de Derrotas.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        games.forEach { game ->
+            Text(
+                text = formatDateTime(game.finishedAt ?: game.startedAt),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                text = "Falta: ${missingPartsText(game)}",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            AppOutlinedButton(text = "Completar", onClick = { onComplete(game) })
+        }
+    }
+}
+
+/** O que falta na partida: vencedor, quem morreu primeiro, ou os dois. */
+private fun missingPartsText(game: Game): String {
+    val winnerPart = if (isTieWithUnknownPlayers(game)) "quem empatou" else "vencedor"
+    return when {
+        needsWinner(game) && needsFirstOut(game) -> "$winnerPart e quem morreu primeiro"
+        needsWinner(game) -> winnerPart
+        else -> "quem morreu primeiro"
+    }
+}
+
+/**
+ * Pergunta só o que falta na partida antiga. O que já estava registrado não aparece aqui e não muda.
+ * Salvar fica desabilitado até preencher cada parte que falta.
+ */
+@Composable
+private fun CompleteGameDialog(
+    game: Game,
+    players: List<Player>,
+    onConfirm: (winnerIds: List<String>, firstOutId: String?, diedTogether: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val askWinner = needsWinner(game)
+    val askFirstOut = needsFirstOut(game)
+    val byId = remember(players) { players.associateBy { it.id } }
+    val gamePlayers = game.playerIds.mapNotNull { byId[it] }
+    val fallenPlayers = gamePlayers.filter { (game.lives[it.id] ?: 0) == 0 }
+    var winnerIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var firstOutId by rememberSaveable { mutableStateOf<String?>(null) }
+    var diedTogether by rememberSaveable { mutableStateOf(false) }
+    val ready = (!askWinner || winnerIds.isNotEmpty()) && (!askFirstOut || firstOutId != null || diedTogether)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Completar partida") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = "Partida de ${formatDateTime(game.finishedAt ?: game.startedAt)}. Preencha só o que falta.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (askWinner) {
+                    Text(
+                        text = "Quem ganhou?",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Marque um jogador para vitória, ou mais de um para empate.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    gamePlayers.forEach { player ->
+                        WinnerOption(
+                            player = player,
+                            selected = player.id in winnerIds,
+                            onToggle = {
+                                winnerIds = if (player.id in winnerIds) {
+                                    winnerIds - player.id
+                                } else {
+                                    winnerIds + player.id
+                                }
+                            },
+                        )
+                    }
+                }
+                if (askFirstOut) {
+                    Text(
+                        text = "Quem morreu primeiro?",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = "Escolha um dos jogadores que ficaram sem vida nesta partida. " +
+                            "Se nenhum morreu antes dos outros, marque Morreram juntos.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    fallenPlayers.forEach { player ->
+                        FirstOutOption(
+                            player = player,
+                            selected = firstOutId == player.id,
+                            onSelect = {
+                                firstOutId = player.id
+                                diedTogether = false
+                            },
+                        )
+                    }
+                    TogetherOption(
+                        selected = diedTogether,
+                        onSelect = {
+                            firstOutId = null
+                            diedTogether = true
+                        },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(winnerIds, firstOutId, diedTogether) },
+                enabled = ready,
+            ) {
+                Text("Salvar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        },
+    )
+}
+
+/** Uma opção de quem morreu primeiro. Só uma pode ficar marcada. */
+@Composable
+private fun FirstOutOption(player: Player, selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        AvatarBadge(player = player, size = 40.dp)
+        Text(
+            text = player.name,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Opção para quando nenhum jogador morreu antes dos outros. A partida não conta em Derrotas. */
+@Composable
+private fun TogetherOption(selected: Boolean, onSelect: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Morreram juntos",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = "Nenhum morreu antes dos outros. Não conta em Derrotas.",
+                style = MaterialTheme.typography.bodyMedium,
             )
         }
     }

@@ -59,22 +59,7 @@ private sealed interface AvatarImage {
 @Composable
 fun AvatarBadge(player: Player, size: Dp, modifier: Modifier = Modifier) {
     check(AVATARS.size == AVATAR_COUNT) { "Quantidade de avatares diferente de AVATAR_COUNT" }
-    val context = LocalContext.current
-    val hasOwnPhoto = player.photoSavedAt != null
-    // A foto do jogador é lida fora da thread principal. O horário faz parte da chave, então uma foto nova é lida de novo.
-    val image by produceState<AvatarImage>(
-        initialValue = if (hasOwnPhoto) AvatarImage.Loading else AvatarImage.Team,
-        player.id,
-        player.photoSavedAt,
-    ) {
-        if (hasOwnPhoto) {
-            value = AvatarImage.Loading
-            val bitmap = withContext(Dispatchers.IO) { AvatarPhotos.load(context, player.id) }
-            value = bitmap?.let { AvatarImage.Own(it.asImageBitmap()) } ?: AvatarImage.Team
-        } else {
-            value = AvatarImage.Team
-        }
-    }
+    val image = rememberAvatarImage(player)
     val frame = modifier.size(size).clip(CircleShape)
     val description = "Avatar de ${player.name}"
     // A foto fica dentro da caixa cortada em círculo. O zoom aumenta a foto dentro dessa caixa.
@@ -93,6 +78,57 @@ fun AvatarBadge(player: Player, size: Dp, modifier: Modifier = Modifier) {
                 modifier = Modifier.fillMaxSize().scale(AVATAR_ZOOM),
             )
             AvatarImage.Loading -> Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant))
+        }
+    }
+}
+
+/**
+ * Lê a foto do jogador fora da thread principal. O horário da foto faz parte da chave,
+ * então uma foto nova é lida de novo.
+ */
+@Composable
+private fun rememberAvatarImage(player: Player): AvatarImage {
+    val context = LocalContext.current
+    val hasOwnPhoto = player.photoSavedAt != null
+    val image by produceState<AvatarImage>(
+        initialValue = if (hasOwnPhoto) AvatarImage.Loading else AvatarImage.Team,
+        player.id,
+        player.photoSavedAt,
+    ) {
+        if (hasOwnPhoto) {
+            value = AvatarImage.Loading
+            val bitmap = withContext(Dispatchers.IO) { AvatarPhotos.load(context, player.id) }
+            value = bitmap?.let { AvatarImage.Own(it.asImageBitmap()) } ?: AvatarImage.Team
+        } else {
+            value = AvatarImage.Team
+        }
+    }
+    return image
+}
+
+/**
+ * Foto do jogador inteira, sem o zoom do avatar e sem cantos arredondados, para a tela ampliada.
+ * A foto ocupa o tamanho que o modifier der.
+ */
+@Composable
+fun PlayerPhoto(player: Player, modifier: Modifier = Modifier) {
+    val image = rememberAvatarImage(player)
+    val description = "Foto de ${player.name}"
+    Box(modifier = modifier) {
+        when (val current = image) {
+            is AvatarImage.Own -> Image(
+                bitmap = current.bitmap,
+                contentDescription = description,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+            AvatarImage.Team -> Image(
+                painter = painterResource(teamPhoto(player.avatar ?: avatarIndexFor(player.id))),
+                contentDescription = description,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
+            AvatarImage.Loading -> Unit
         }
     }
 }

@@ -4,6 +4,8 @@ import com.rankfodinha.app.data.FodinhaData
 import com.rankfodinha.app.data.Game
 import com.rankfodinha.app.data.GameSettings
 import com.rankfodinha.app.data.Player
+import com.rankfodinha.app.data.isIncomplete
+import com.rankfodinha.app.data.needsFirstOut
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -83,6 +85,7 @@ class FodinhaViewModelTest {
         assertEquals("Os dados ainda não foram carregados.", vm.addPlayer("Bruno", vm.newPlayerId()))
         assertEquals("Os dados ainda não foram carregados.", vm.startGame(listOf("a", "b"), settings()))
         assertEquals("Os dados ainda não foram carregados.", vm.removePlayer("a"))
+        assertEquals("Os dados ainda não foram carregados.", vm.completeGame("a", emptyList(), null, false))
         vm.adjustLives("a", -1)
         vm.clearRanking()
         vm.cancelGame()
@@ -396,5 +399,124 @@ class FodinhaViewModelTest {
         screen.vm.adjustLives(screen.id("Ana"), 1)
 
         assertEquals(before, screen.state)
+    }
+
+    // ---------- Completar partida antiga ----------
+
+    private val ana = Player("ana", "Ana")
+    private val bruno = Player("bruno", "Bruno")
+    private val carla = Player("carla", "Carla")
+
+    /** Partida antiga encerrada. Sem vencedor, a menos que [winners] diga; sem ordem das mortes, a menos que [eliminated] diga. */
+    private fun oldGame(
+        lives: Map<String, Int>,
+        winners: List<String> = emptyList(),
+        eliminated: List<String> = emptyList(),
+        finished: Boolean = true,
+    ): Game = Game(
+        id = "antiga",
+        startedAt = "2026-01-01T10:00:00Z",
+        finishedAt = if (finished) "2026-01-01T11:00:00Z" else null,
+        playerIds = lives.keys.toList(),
+        settings = GameSettings(),
+        lives = lives,
+        winnerIds = winners,
+        eliminated = eliminated,
+    )
+
+    /** Tela com a partida antiga já carregada, e os três jogadores cadastrados. */
+    private fun oldScreen(game: Game) = Screen(FodinhaData(players = listOf(ana, bruno, carla), games = listOf(game)))
+
+    @Test
+    fun completingAGameWithoutAWinnerRecordsTheWinnersAndTheFirstDeath() {
+        val screen = oldScreen(oldGame(mapOf("ana" to 0, "bruno" to 0, "carla" to 0)))
+
+        assertNull(screen.vm.completeGame("antiga", listOf("carla", "ana"), "bruno", diedTogether = false))
+
+        val game = screen.game
+        assertEquals("os vencedores ficam na ordem da mesa", listOf("ana", "carla"), game.winnerIds)
+        assertEquals(listOf("bruno", "ana", "carla"), game.eliminated)
+        assertFalse(game.firstDeathTogether)
+        assertFalse(isIncomplete(game))
+        assertEquals(screen.state, screen.repo.stored)
+    }
+
+    @Test
+    fun completingNeedsTheMissingWinnerAndFirstDeathAndChecksThePlayers() {
+        val screen = oldScreen(oldGame(mapOf("ana" to 0, "bruno" to 0, "carla" to 0)))
+
+        assertEquals("Escolha pelo menos um jogador.", screen.vm.completeGame("antiga", emptyList(), "bruno", false))
+        assertEquals("Escolha jogadores da partida.", screen.vm.completeGame("antiga", listOf("fantasma"), "bruno", false))
+        assertEquals("Escolha quem morreu primeiro.", screen.vm.completeGame("antiga", listOf("ana"), null, false))
+
+        assertTrue("nada mudou", screen.game.winnerIds.isEmpty() && screen.game.eliminated.isEmpty())
+        assertTrue(screen.repo.saves.isEmpty())
+    }
+
+    @Test
+    fun aPlayerWhoStillHadLivesCannotBeTheFirstToDie() {
+        val screen = oldScreen(oldGame(mapOf("ana" to 1, "bruno" to 0, "carla" to 0), winners = listOf("ana")))
+        assertEquals("Escolha quem morreu primeiro.", screen.vm.completeGame("antiga", emptyList(), "ana", false))
+    }
+
+    @Test
+    fun completingOnlyFillsWhatIsMissing() {
+        val screen = oldScreen(oldGame(mapOf("ana" to 1, "bruno" to 0, "carla" to 0), winners = listOf("ana")))
+
+        assertNull(screen.vm.completeGame("antiga", listOf("carla"), "bruno", diedTogether = false))
+
+        assertEquals("o vencedor já registrado não muda", listOf("ana"), screen.game.winnerIds)
+        assertEquals(listOf("bruno", "carla"), screen.game.eliminated)
+    }
+
+    @Test
+    fun diedTogetherKeepsTheGameOutOfFirstDeaths() {
+        val screen = oldScreen(oldGame(mapOf("ana" to 0, "bruno" to 0, "carla" to 0)))
+
+        assertNull(screen.vm.completeGame("antiga", listOf("ana", "bruno", "carla"), null, diedTogether = true))
+
+        val game = screen.game
+        assertTrue(game.firstDeathTogether)
+        assertTrue("ninguém entra como primeiro a morrer", game.eliminated.isEmpty())
+        assertFalse(needsFirstOut(game))
+        assertFalse(isIncomplete(game))
+    }
+
+    @Test
+    fun diedTogetherCannotBeMixedWithAPlayerWhoDiedFirst() {
+        val screen = oldScreen(oldGame(mapOf("ana" to 0, "bruno" to 0, "carla" to 0)))
+
+        assertEquals(
+            "Escolha quem morreu primeiro, ou marque que morreram juntos.",
+            screen.vm.completeGame("antiga", listOf("ana"), "bruno", diedTogether = true),
+        )
+        assertFalse(screen.game.firstDeathTogether)
+        assertTrue(screen.game.winnerIds.isEmpty())
+    }
+
+    @Test
+    fun aCompletedGameCannotBeCompletedAgain() {
+        val screen = oldScreen(
+            oldGame(mapOf("ana" to 1, "bruno" to 0), winners = listOf("ana"), eliminated = listOf("bruno")),
+        )
+        assertEquals(
+            "Esta partida já está completa.",
+            screen.vm.completeGame("antiga", emptyList(), null, diedTogether = false),
+        )
+    }
+
+    @Test
+    fun aRunningGameOrAnUnknownGameCannotBeCompleted() {
+        val running = oldScreen(oldGame(mapOf("ana" to 1, "bruno" to 0), finished = false))
+        assertEquals(
+            "Esta partida ainda está em andamento.",
+            running.vm.completeGame("antiga", listOf("ana"), "bruno", diedTogether = false),
+        )
+
+        val screen = oldScreen(oldGame(mapOf("ana" to 0, "bruno" to 0)))
+        assertEquals(
+            "Esta partida não existe mais.",
+            screen.vm.completeGame("nao-existe", listOf("ana"), "bruno", diedTogether = false),
+        )
     }
 }

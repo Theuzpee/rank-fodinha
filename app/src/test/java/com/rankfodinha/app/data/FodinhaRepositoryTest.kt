@@ -20,6 +20,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -181,7 +182,10 @@ class FodinhaRepositoryTest {
         assertEquals(setOf("players", "games"), root.keys)
         val finished = root.getValue("games").jsonArray[0].jsonObject
         assertEquals(
-            setOf("id", "startedAt", "finishedAt", "playerIds", "settings", "lives", "winnerIds", "eliminated"),
+            setOf(
+                "id", "startedAt", "finishedAt", "playerIds", "settings", "lives", "winnerIds", "eliminated",
+                "firstDeathTogether",
+            ),
             finished.keys,
         )
         assertEquals(setOf("startingLives"), finished.getValue("settings").jsonObject.keys)
@@ -289,5 +293,19 @@ class FodinhaRepositoryTest {
         }
         assertEquals("{quebrado", rawValue(store, legacyKey))
         assertNull(rawValue(store, dataKey))
+    }
+
+    @Test
+    fun aGameSavedBeforeTheFirstDeathTogetherFieldLoadsWithItOff() {
+        val store = openStore(newFile())
+        val savedBefore = """{"players":[{"id":"a","name":"Ana"}],"games":[{"id":"g","startedAt":"2026-01-01T10:00:00Z",""" +
+            """"finishedAt":"2026-01-01T11:00:00Z","playerIds":["a"],"settings":{"startingLives":5},"lives":{"a":0},""" +
+            """"winnerIds":["a"],"eliminated":[]}]}"""
+        runBlocking { store.edit { it[dataKey] = savedBefore } }
+
+        val game = runBlocking { repository(store).load().games.single() }
+
+        assertFalse(game.firstDeathTogether)
+        assertEquals(listOf("a"), game.winnerIds)
     }
 }

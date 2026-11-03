@@ -118,4 +118,16 @@ class FirstDeathRankingTest {
         assertEquals(0, rows.byId("ana").firstDeaths)
         assertEquals(0, rows.byId("bruno").firstDeaths)
     }
+
+    @Test
+    fun aGameWhoseFirstDeathsWereTogetherCountsForNobody() {
+        val together = endedGame("juntos", listOf("ana", "bruno", "carla"), listOf("ana", "bruno"))
+            .copy(firstDeathTogether = true)
+        val normal = endedGame("normal", listOf("ana", "bruno", "carla"), listOf("carla", "ana"))
+        val rows = buildFirstDeathRanking(listOf(ana, bruno, carla), listOf(together, normal))
+        assertEquals(1, rows.byId("carla").firstDeaths)
+        assertEquals(0, rows.byId("ana").firstDeaths)
+        assertEquals(0, rows.byId("bruno").firstDeaths)
+        assertEquals(2, rows.byId("ana").played)
+    }
 }

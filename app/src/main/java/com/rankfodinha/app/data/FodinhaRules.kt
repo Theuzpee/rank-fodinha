@@ -25,17 +25,14 @@ fun createGame(id: String, startedAt: String, playerIds: List<String>, settings:
 fun alivePlayers(game: Game): List<String> =
     game.playerIds.filter { (game.lives[it] ?: 0) > 0 }
 
-/** Com quantos jogadores com vida o app oferece o botão de empate. */
-const val TIE_OFFER_ALIVE = 3
-
 /**
- * Jogadores que podem empatar agora: exatamente [TIE_OFFER_ALIVE] com vida, e cada um com uma vida só.
+ * Jogadores que podem empatar agora: dois ou mais com vida, e todos com uma vida só.
  * Nulo nos outros casos e em partidas já encerradas. A ordem é a da mesa.
  */
 fun tieOfferPlayers(game: Game): List<String>? {
     if (game.finishedAt != null) return null
     val alive = alivePlayers(game)
-    if (alive.size != TIE_OFFER_ALIVE) return null
+    if (alive.size < 2) return null
     return if (alive.all { game.lives[it] == 1 }) alive else null
 }
 
@@ -63,3 +60,26 @@ fun changeLives(game: Game, playerId: String, delta: Int, finishedAt: String): G
         updated
     }
 }
+
+/**
+ * Partida encerrada sem vencedor registrado. Acontece em partidas antigas, em que todos ficaram sem vida ao mesmo tempo.
+ */
+fun needsWinner(game: Game): Boolean = game.finishedAt != null && game.winnerIds.isEmpty()
+
+/**
+ * Partida encerrada em que nem todos os jogadores sem vida estão na lista de eliminados.
+ * Partidas antigas não guardam essa lista, então falta saber quem morreu primeiro.
+ * Quando as primeiras mortes foram juntas, a pergunta já foi respondida e não volta.
+ */
+fun needsFirstOut(game: Game): Boolean =
+    game.finishedAt != null && !game.firstDeathTogether && game.eliminated.size < game.lives.count { it.value == 0 }
+
+/** Partida encerrada que ainda precisa de vencedor, ou de quem morreu primeiro. */
+fun isIncomplete(game: Game): Boolean = needsWinner(game) || needsFirstOut(game)
+
+/**
+ * Partida encerrada sem vencedor e com todos sem vida. Acontece em partidas antigas, em que todos perderam a última
+ * vida ao mesmo tempo. Pela regra do app, isso é empate, mas os jogadores que empataram não foram guardados.
+ */
+fun isTieWithUnknownPlayers(game: Game): Boolean =
+    game.finishedAt != null && game.winnerIds.isEmpty() && game.lives.isNotEmpty() && game.lives.values.all { it == 0 }

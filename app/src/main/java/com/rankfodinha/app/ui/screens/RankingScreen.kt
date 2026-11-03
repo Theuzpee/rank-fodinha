@@ -30,9 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.rankfodinha.app.data.FirstDeathRow
 import com.rankfodinha.app.data.Player
 import com.rankfodinha.app.data.RankingRow
-import com.rankfodinha.app.data.buildDefeatRanking
+import com.rankfodinha.app.data.buildFirstDeathRanking
 import com.rankfodinha.app.data.buildRanking
 import com.rankfodinha.app.ui.components.AppCard
 import com.rankfodinha.app.ui.components.AppOutlinedButton
@@ -44,7 +45,7 @@ import com.rankfodinha.app.viewmodel.FodinhaViewModel
 /** As duas seções do ranking, com a explicação que aparece embaixo do botão. */
 private enum class RankingSection(val label: String, val explanation: String) {
     Vitoria("Vitória", "Quem mais ganhou partidas"),
-    Derrotas("Derrotas", "Quem mais perdeu partidas. Empate não conta como derrota."),
+    Derrotas("Derrotas", "Quem mais vezes morreu primeiro em uma partida"),
 }
 
 /** Uma linha de qualquer seção, com o resumo já pronto. */
@@ -70,13 +71,13 @@ fun RankingScreen(viewModel: FodinhaViewModel) {
             )
         }
     }
-    val defeatItems = remember(data) {
+    val deathItems = remember(data) {
         val players = data.players.associateBy { it.id }
-        buildDefeatRanking(data.players, data.games).map { row ->
+        buildFirstDeathRanking(data.players, data.games).map { row ->
             RankingItem(
                 player = players[row.playerId] ?: Player(id = row.playerId, name = row.name),
                 position = row.position,
-                stats = defeatStatsText(row),
+                stats = deathStatsText(row),
                 highlight = false,
             )
         }
@@ -87,7 +88,7 @@ fun RankingScreen(viewModel: FodinhaViewModel) {
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     // Um nome guardado de uma versão anterior do app cai na seção padrão, em vez de quebrar a tela.
     val section = RankingSection.entries.firstOrNull { it.name == sectionName } ?: RankingSection.Vitoria
-    val rankingItems = if (section == RankingSection.Vitoria) winItems else defeatItems
+    val rankingItems = if (section == RankingSection.Vitoria) winItems else deathItems
     // A lista começa sempre do primeiro colocado: ao abrir a aba e ao trocar de seção.
     val listState = rememberLazyListState()
     LaunchedEffect(section) { listState.scrollToItem(0) }
@@ -213,8 +214,9 @@ private fun winStatsText(row: RankingRow): String {
     return "$wins · $ties · $losses"
 }
 
-/** Só a quantidade de derrotas do jogador. Empate não entra aqui. */
-private fun defeatStatsText(row: RankingRow): String {
+/** Só a quantidade de vezes em que o jogador morreu primeiro. */
+private fun deathStatsText(row: FirstDeathRow): String {
     if (row.played == 0) return "Ainda sem partidas encerradas"
-    return plural(row.losses, "derrota", "derrotas")
+    val times = plural(row.firstDeaths, "vez", "vezes")
+    return "$times morreu primeiro"
 }

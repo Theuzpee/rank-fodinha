@@ -198,4 +198,126 @@ class FodinhaRulesTest {
         game = changeLives(game, "Bruno", -1, END)
         assertEquals(listOf("Ana"), game.winnerIds)
     }
+
+    // ---------- Partidas antigas: vencedor, primeiro a morrer e empate ----------
+
+    /** Partida encerrada no formato antigo: pode faltar o vencedor, e a ordem das mortes não é conhecida. */
+    private fun oldGame(
+        lives: Map<String, Int>,
+        winners: List<String> = emptyList(),
+        eliminated: List<String> = emptyList(),
+        finished: Boolean = true,
+        firstDeathTogether: Boolean = false,
+    ): Game = Game(
+        id = "antiga",
+        startedAt = START,
+        finishedAt = if (finished) END else null,
+        playerIds = lives.keys.toList(),
+        settings = GameSettings(),
+        lives = lives,
+        winnerIds = winners,
+        eliminated = eliminated,
+        firstDeathTogether = firstDeathTogether,
+    )
+
+    @Test
+    fun aFinishedGameWithoutAWinnerNeedsAWinner() {
+        assertTrue(needsWinner(oldGame(mapOf("Ana" to 0, "Bruno" to 0))))
+        assertFalse(needsWinner(oldGame(mapOf("Ana" to 1, "Bruno" to 0), winners = listOf("Ana"))))
+    }
+
+    @Test
+    fun aRunningGameNeverAsksForAWinnerOrAFirstDeath() {
+        val running = oldGame(mapOf("Ana" to 1, "Bruno" to 0), finished = false)
+        assertFalse(needsWinner(running))
+        assertFalse(needsFirstOut(running))
+        assertFalse(isIncomplete(running))
+    }
+
+    @Test
+    fun aFinishedGameWhoseLosersHaveNoKnownOrderNeedsTheFirstDeath() {
+        assertTrue(needsFirstOut(oldGame(mapOf("Ana" to 1, "Bruno" to 0), winners = listOf("Ana"))))
+    }
+
+    @Test
+    fun noFirstDeathIsNeededWhenNobodyLostLives() {
+        val game = oldGame(mapOf("Ana" to 1, "Bruno" to 1), winners = listOf("Ana"))
+        assertFalse(needsFirstOut(game))
+        assertFalse(isIncomplete(game))
+    }
+
+    @Test
+    fun noFirstDeathIsNeededWhenTheOrderIsKnown() {
+        val game = oldGame(mapOf("Ana" to 1, "Bruno" to 0), winners = listOf("Ana"), eliminated = listOf("Bruno"))
+        assertFalse(needsFirstOut(game))
+    }
+
+    @Test
+    fun theFirstDeathIsStillNeededWhenOnlySomeDeathsAreKnown() {
+        val game = oldGame(
+            mapOf("Ana" to 1, "Bruno" to 0, "Carla" to 0),
+            winners = listOf("Ana"),
+            eliminated = listOf("Carla"),
+        )
+        assertTrue(needsFirstOut(game))
+    }
+
+    @Test
+    fun firstDeathTogetherAnswersTheFirstDeathQuestion() {
+        val game = oldGame(mapOf("Ana" to 0, "Bruno" to 0), winners = listOf("Ana"), firstDeathTogether = true)
+        assertFalse(needsFirstOut(game))
+        assertFalse(isIncomplete(game))
+    }
+
+    @Test
+    fun aGameIsIncompleteWhenTheWinnerOrTheFirstDeathIsMissing() {
+        assertTrue(isIncomplete(oldGame(mapOf("Ana" to 0, "Bruno" to 0))))
+        assertTrue(isIncomplete(oldGame(mapOf("Ana" to 1, "Bruno" to 0), winners = listOf("Ana"))))
+        assertFalse(isIncomplete(oldGame(mapOf("Ana" to 1, "Bruno" to 1), winners = listOf("Ana"))))
+    }
+
+    @Test
+    fun aTieWithoutRecordedPlayersIsOnlyDetectedWhenEveryoneIsOut() {
+        assertTrue(isTieWithUnknownPlayers(oldGame(mapOf("Ana" to 0, "Bruno" to 0, "Carla" to 0))))
+        assertFalse(
+            "com vencedor, o empate já tem nomes",
+            isTieWithUnknownPlayers(oldGame(mapOf("Ana" to 0, "Bruno" to 0), winners = listOf("Ana", "Bruno"))),
+        )
+        assertFalse("alguém ainda tem vida", isTieWithUnknownPlayers(oldGame(mapOf("Ana" to 1, "Bruno" to 0))))
+        assertFalse(
+            "partida em andamento",
+            isTieWithUnknownPlayers(oldGame(mapOf("Ana" to 0, "Bruno" to 0), finished = false)),
+        )
+    }
+
+    // ---------- Oferta de empate ----------
+
+    @Test
+    fun tieOfferAppearsWhenEveryAlivePlayerHasOneLife() {
+        val game = changeLives(newGame("Ana", "Bruno", "Carla", lives = 1), "Ana", -1, END)
+        assertEquals(listOf("Bruno", "Carla"), tieOfferPlayers(game))
+    }
+
+    @Test
+    fun tieOfferWorksWithTwoPlayers() {
+        assertEquals(listOf("Ana", "Bruno"), tieOfferPlayers(newGame("Ana", "Bruno", lives = 1)))
+    }
+
+    @Test
+    fun tieOfferIsNullWhileAnAlivePlayerHasMoreThanOneLife() {
+        val game = changeLives(newGame("Ana", "Bruno", "Carla", lives = 2), "Ana", -1, END)
+        assertNull(tieOfferPlayers(game))
+    }
+
+    @Test
+    fun tieOfferNeedsAtLeastTwoAlivePlayers() {
+        val game = newGame("Ana", "Bruno").copy(lives = mapOf("Ana" to 1, "Bruno" to 0))
+        assertNull(tieOfferPlayers(game))
+    }
+
+    @Test
+    fun tieOfferIsNullForFinishedGames() {
+        val finished = changeLives(newGame("Ana", "Bruno", lives = 1), "Ana", -1, END)
+        assertNull(tieOfferPlayers(finished))
+    }
 }

@@ -32,13 +32,18 @@ data class Game(
     val settings: GameSettings,
     /** Vidas atuais de cada jogador da partida. Quem chega a 0 está eliminado. */
     val lives: Map<String, Int>,
-    /** Vazio enquanto a partida não termina. */
+    /** Vazio enquanto a partida não termina. Partidas antigas podem ter terminado sem vencedor registrado. */
     val winnerIds: List<String> = emptyList(),
     /**
      * Quem perdeu a última vida, na ordem em que foi eliminado. O primeiro da lista morreu primeiro.
      * Quem volta à vida por correção sai da lista. Partidas antigas não guardam essa ordem e ficam vazias.
      */
     val eliminated: List<String> = emptyList(),
+    /**
+     * Verdadeiro quando as primeiras mortes foram juntas, então não há um primeiro a morrer.
+     * Só partidas antigas usam isso, marcado na hora de completar a partida. Essas partidas não contam em Derrotas.
+     */
+    val firstDeathTogether: Boolean = false,
 )
 
 @Serializable
